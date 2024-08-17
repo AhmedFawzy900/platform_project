@@ -48,4 +48,9 @@ class User extends Authenticatable
     ];
 
     protected $dates = ['deleted_at'];
+
+    public function grades()
+    {
+        return $this->hasMany(Grade::class,'user_id');
+    }
 }

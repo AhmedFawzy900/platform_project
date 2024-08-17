@@ -1,9 +1,13 @@
 <?php
 
 use App\Http\Controllers\API\CategoryController;
+use App\Http\Controllers\API\ChoiceController;
 use App\Http\Controllers\API\CourseController;
+use App\Http\Controllers\API\GradeController;
 use App\Http\Controllers\API\LessonController;
 use App\Http\Controllers\API\MaterialController;
+use App\Http\Controllers\API\QuestionController;
+use App\Http\Controllers\API\QuizController;
 use App\Http\Controllers\API\UserController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -58,4 +62,10 @@ Route::middleware('auth:sanctum', 'check.session')->group(function () {
         Route::get('/materials/trashed', [MaterialController::class, 'trash']);
         Route::post('materials/{id}/restore', [MaterialController::class, 'restore']);
         Route::delete('materials/{id}/force-delete', [MaterialController::class, 'forceDelete']);
+
+        // quize routes (quitions , answers ,responces , results)
+        Route::apiResource('quizzes', QuizController::class);
+        Route::apiResource('quizzes.questions', QuestionController::class);
+        Route::apiResource('questions.choices', ChoiceController::class);
+        Route::apiResource('grades', GradeController::class);
 });
