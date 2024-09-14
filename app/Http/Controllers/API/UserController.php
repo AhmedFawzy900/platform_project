@@ -9,71 +9,128 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+
 class UserController extends Controller
 {
      // Fetch all users (admin only)
      public function index()
      {
-         $users = User::all();
-         return response()->json($users);
+         try {
+             $users = User::all();
+             return response()->json($users);
+         } catch (\Exception $e) {
+             return response()->json(['error' => 'Error fetching users'], 500);
+         }
      }
  
      // Fetch a specific user by ID
      public function show($id)
      {
-         $user = User::findOrFail($id);
-         return response()->json($user);
+         try {
+             $user = User::findOrFail($id);
+             return response()->json($user);
+         } catch (\Exception $e) {
+             return response()->json(['error' => 'Error fetching user'], 404);
+         }
      }
  
      // Update user profile
      public function update(Request $request, $id)
      {
-         $user = User::findOrFail($id);
- 
-         $validatedData = $request->validate([
-             'name' => 'sometimes|string|max:255',
-             'email' => 'sometimes|email|unique:users,email,' . $id,
-             'phone' => 'sometimes|string|max:15',
-         ]);
- 
-         if ($request->has('password')) {
-             $validatedData['password'] = Hash::make($request->password);
+         try {
+             // Find the user by ID or fail if not found
+             $user = User::findOrFail($id);
+     
+             // Start building validation rules
+             $rules = [
+                 'name' => 'sometimes|string|max:255',
+                 'email' => 'sometimes|email',
+                 'phone' => 'sometimes|string|max:15',
+             ];
+     
+             // Apply unique validation rules only if the fields are different from the existing values
+             if ($request->has('email') && $request->email !== $user->email) {
+                 $rules['email'] = 'email|unique:users,email';
+             }
+     
+             if ($request->has('phone') && $request->phone !== $user->phone) {
+                 $rules['phone'] = 'string|max:15|unique:users,phone';
+             }
+     
+             // Validate the request data with the constructed rules
+             $validatedData = $request->validate($rules);
+     
+             // Hash the password if provided
+             if ($request->has('password')) {
+                 $validatedData['password'] = Hash::make($request->password);
+             }
+     
+             // Update the user with validated data
+             $user->update($validatedData);
+     
+             // Return the updated user data
+             return response()->json($user);
+     
+         } catch (ValidationException $e) {
+             // Handle validation errors
+             return response()->json([
+                 'error' => 'Validation failed',
+                 'messages' => $e->errors()
+             ], 422);
+     
+         } catch (\Exception $e) {
+             // Handle other types of exceptions
+             return response()->json(['error' => 'An unexpected error occurred', 'message' => $e->getMessage()], 500);
          }
- 
-         $user->update($validatedData);
-         return response()->json($user);
      }
  
      // soft Delete a user (admin only)
      public function destroy($id)
      {
-         $user = User::findOrFail($id);
-         $user->delete();
+         try {
+             $user = User::findOrFail($id);
+             $user->delete();
  
-         return response()->json(['message' => 'User deleted successfully']);
+             return response()->json(['message' => 'User deleted successfully']);
+         } catch (\Exception $e) {
+             return response()->json(['error' => 'Error deleting user'], 500);
+         }
      }
 
     //  fetch trash users (admin only)
     public function trash()
     {
-        $users = User::onlyTrashed()->get();
-        return response()->json($users);
+        try {
+            $users = User::onlyTrashed()->get();
+            return response()->json($users);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error fetching trashed users'], 500);
+        }
     }
     // Restore a soft deleted user (admin only)
     public function restore($id)
     {
-        $user = User::onlyTrashed()->findOrFail($id);
-        $user->restore();
+        try {
+            $user = User::onlyTrashed()->findOrFail($id);
+            $user->restore();
 
-        return response()->json(['message' => 'User restored successfully']);
+            return response()->json(['message' => 'User restored successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error restoring user'], 500);
+        }
     }
     // force delete a user (admin only)
     public function forceDelete($id)
     {
-        $user = User::onlyTrashed()->findOrFail($id);
-        $user->forceDelete();
+        try {
+            $user = User::onlyTrashed()->findOrFail($id);
+            $user->forceDelete();
 
-        return response()->json(['message' => 'User permanently deleted']);
+            return response()->json(['message' => 'User permanently deleted']);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error permanently deleting user'], 500);
+        }
     }
 
     //  Register a new user
@@ -82,7 +139,7 @@ class UserController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
-            'phone' => 'required|string|max:255',
+            'phone' => 'required|string|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
@@ -142,10 +199,14 @@ class UserController extends Controller
     // logout a user
     public function logout(Request $request)
     {
-        $request->user()->currentAccessToken()->delete();
-        $request->user()->session_token = null;
-        $request->user()->save();
+        try {
+            $request->user()->currentAccessToken()->delete();
+            $request->user()->session_token = null;
+            $request->user()->save();
 
-        return response()->json(['message' => 'Logged out successfully']);
+            return response()->json(['message' => 'Logged out successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['error' => 'Error logging out: ' . $e->getMessage()], 500);
+        }
     }
 }
